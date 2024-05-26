@@ -241,6 +241,8 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
 
     df.rename(columns={'texts': 'tokens'}, inplace=True)
 
+    df.reset_index(names='id', inplace=True)
+
     return df
 
 
@@ -269,6 +271,7 @@ def create_datasets(df: pd.DataFrame, test_size: float = 0.2, valid_size: float 
 
     # Définir les Features pour chaque colonne du DataFrame
     features = Features({
+        'id': Value(dtype='int64', id=None),
         'tokens': Sequence(feature=Value(dtype='string', id=None), length=-1, id=None),
         'psr_tags': Sequence(feature=ClassLabel(names=['O', 'DET', 'APPO', 'AMBIGUE'], id=None), length=-1, id=None)
     })
@@ -289,18 +292,22 @@ def create_datasets(df: pd.DataFrame, test_size: float = 0.2, valid_size: float 
 
 
 # upload the dataset to the Hugging Face Hub or to the local directory
-def save_dataset(dataset: DatasetDict, name: str, local_dir: str = None):
+def save_dataset(dataset: DatasetDict, name: str, directory: str = None, push_hub: bool = True):
     """
     Upload the dataset to the Hugging Face Hub.
 
     Args:
         dataset (DatasetDict): The dataset to upload.
         name (str): The name of the dataset.
-        local_dir (str): The local directory to save the dataset. (if None, the dataset is uploaded to the Hugging Face Hub)
+        directory (str): The local directory to save the dataset. (if None, the dataset is uploaded to the Hugging Face Hub)
+        push_hub (bool): Whether to upload the dataset to the Hugging Face Hub.
     """
-    if local_dir:
-        dataset.save_to_disk(local_dir)
-    else:
+    if directory:
+        if directory[-1] != '/':
+            directory += '/'
+        dataset.save_to_disk(directory + name)
+
+    if push_hub or not directory:
         dataset.push_to_hub(name)
 
 
@@ -324,13 +331,17 @@ if __name__ == '__main__':
     parser.add_argument('--local_dir', type=str, default='../datasets/'
                         , help="The local directory to save the dataset."
                         , required=False)
+    parser.add_argument('--push_hub', type=bool, default=True
+                        , help="Whether to upload the dataset to the Hugging Face Hub."
+                        , required=False)
 
     args = parser.parse_args()
 
     file_path = args.file_path
     sheet_name = args.sheet_name
     dataset_name = args.dataset_name
-    local_dir = args.local_dir + dataset_name
+    local_dir = args.local_dir
+    push_hub = args.push_hub
 
     print('Loading data...')
     data = load_data(file_path=file_path, sheet_name=sheet_name)
@@ -346,7 +357,7 @@ if __name__ == '__main__':
 
     # Upload the datasets to the Hugging Face Hub
     print('Uploading datasets...')
-    save_dataset(datasets, name=dataset_name, local_dir=local_dir)
+    save_dataset(datasets, name=dataset_name, directory=local_dir, push_hub=push_hub)
 
     print('Dataset uploaded successfully!')
 
